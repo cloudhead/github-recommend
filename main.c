@@ -7,21 +7,21 @@
  */
 
 #include "main.h"
+#include "recommend.h"
 #define SPLIT 1500
 
 User **users;
 Repo **repos;
-pid_t pid;
 
 void print(int n) { printf("%d\n", n); }
 
 int main(int argc, const char *argv[])
 {
-    User **test, **filtered_users;
+    User **input, **filtered_users;
     int t, status;
         
     printf("parsing data...\n");
-    test = load_files();
+    input = load_files();
     printf("filtering...\n");
     filtered_users = filter();
     printf("sorting repos...\n");
@@ -43,17 +43,15 @@ int main(int argc, const char *argv[])
     
     if(pid > 0) {
         t = time(NULL);
-        test = recommend(test, filtered_users, 0, SPLIT);
+        recommend(input, filtered_users, 0, SPLIT, 10, &nearest_neighbour);
         wait(&status);
         printf("\n");
         printf("total time: %lds\n", time(NULL) - t);
         printf("printing results to results.txt\n");
-        results(test, 0, SPLIT);
     }
     else if(pid == 0) {
-        test = recommend(test, filtered_users, SPLIT, stats.test_count);
+        recommend(input, filtered_users, SPLIT, stats.input_count, 10, &nearest_neighbour);
         printf("*"); fflush(stdout);
-        results(test, SPLIT, stats.test_count);
     }
     else {
         fprintf(stderr, "couldn't fork!");
@@ -61,11 +59,11 @@ int main(int argc, const char *argv[])
     }
     
     /* Free the memory */
-    for(int i = 0; i < stats.last_user;  i++) if(users[i]) free(users[i]);
+    for(int i = 0; i < stats.last_user;  i++) if(users[i]) { free(users[i]->recommend); free(users[i]); }
     for(int i = 0; i < stats.repo_count; i++) free(repos_array[i]);
     
     free(users); free(repos_array);
-    free(repos); free(test);
+    free(repos); free(input);
     free(filtered_users);
          
     /* Exit child procress */
@@ -197,33 +195,33 @@ User** load_files()
     /*
      *  Test Data
      */
-    int test_count = 0;
+    int input_count = 0;
     User **test = calloc(64000, P_SIZE);
 
     while( fgets(line, sizeof(line), ftest) != NULL ) {
         sscanf(line, "%d\n", &user);
         if(users[user]) {
-            test[test_count] = malloc(sizeof(User));
-            memcpy(test[test_count++], users[user], sizeof(User));
+            test[input_count] = malloc(sizeof(User));
+            memcpy(test[input_count++], users[user], sizeof(User));
         }
     }
     
     /* Save some stats */
     stats.repo_count  = repo_count;
     stats.user_count  = user_count;
-    stats.test_count  = test_count;
+    stats.input_count  = input_count;
     stats.watch_count = watch_count;
     
     /* Reallocate the pointer arrays to fit more tightly */
     realloc(repos_array, repo_count * P_SIZE);
-    realloc(test,  test_count * P_SIZE);
+    realloc(test,  input_count * P_SIZE);
     realloc(users, (stats.last_user + 1) * P_SIZE);
     realloc(repos, (stats.last_repo + 1) * P_SIZE);
     
     printf("found %d repositories.\n", repo_count);
     printf("found %d users.\n", user_count);
     printf("found %d watches.\n", watch_count);
-    printf("found %d test users.\n", test_count);
+    printf("found %d test users.\n", input_count);
     
     fclose(frepos); fclose(fdata);
     fclose(flang);  fclose(ftest);
@@ -231,34 +229,7 @@ User** load_files()
     return test;
 }
 
-
-void results(User **set, int from, int to)
-{
-    FILE *fresults;
-    char mode[1];
-    
-    if(pid > 0) mode[0] = 'a';
-    else mode[0] = 'w';
-    
-    if((fresults = fopen("data/results.txt", mode)) == NULL) {
-        printf("can't create results file.");
-        exit(1);
-    }
-    for(int i = from; i < to; i++) {
-        fprintf(fresults, "%d:", set[i]->id);
-        for(int j = 0; j < RECOMMEND_SIZE; j++) {
-            if(set[i]->recommend[j].repo) {
-                if(j) fprintf(fresults, ",");
-                fprintf(fresults, "%d", set[i]->recommend[j].repo->id); 
-            }
-        }
-        fprintf(fresults, "\n");
-    }
-    
-    fclose(fresults);
-}
-
-User **filter()
+User ** filter()
 {    
     /* Filter users */
     User **filtered_users = calloc(64000, P_SIZE);

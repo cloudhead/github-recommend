@@ -1,12 +1,10 @@
-/*
- *  recommend.h
- *  github-recommend
- *
- *  Created by Alexis Sellier on 07/08/09.
- *  Copyright 2009 __MyCompanyName__. All rights reserved.
- *
- */
-
-#include "main.h"
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
+
+void recommend(User **, User **, int, int, size_t, int(*algorithm)(User *, User **));
+
+/* Algorithms */
+int nearest_neighbour(User *, User **);
+int popular(User *, User **);
+int forks(User *, User **);
+int by_owner(User *, User **);

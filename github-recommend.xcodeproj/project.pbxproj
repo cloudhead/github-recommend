@@ -62,11 +62,11 @@
 			isa = PBXGroup;
 			children = (
 				08FB7796FE84155DC02AAC07 /* main.c */,
-				C3F1684B102BBB9A00291DCA /* recommend.h */,
-				C3F16FB210305A5F00291DCA /* inspect.h */,
-				C3F16FB310305A5F00291DCA /* inspect.c */,
-				C3F1684C102BBB9A00291DCA /* recommend.c */,
 				C30EFDF61027125400776F7E /* main.h */,
+				C3F1684C102BBB9A00291DCA /* recommend.c */,
+				C3F1684B102BBB9A00291DCA /* recommend.h */,
+				C3F16FB310305A5F00291DCA /* inspect.c */,
+				C3F16FB210305A5F00291DCA /* inspect.h */,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -192,7 +192,7 @@
 				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				GCC_MODEL_PPC64 = NO;
 				GCC_ONE_BYTE_BOOL = YES;
-				GCC_OPTIMIZATION_LEVEL = 1;
+				GCC_OPTIMIZATION_LEVEL = s;
 				GCC_UNROLL_LOOPS = YES;
 				GCC_VERSION = 4.2;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES;

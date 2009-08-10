@@ -2,15 +2,65 @@
  *  recommend.c
  *  github-recommend
  *
- *  Created by Alexis Sellier on 07/08/09.
- *  Copyright 2009 __MyCompanyName__. All rights reserved.
+ *  Copyright 2009 Alexis Sellier
  *
  */
 
+#include "main.h"
 #include "recommend.h"
 
-void recommend() {
+int compare_matches(const void *, const void *);
+void result(User *, size_t, FILE *);
+
+void recommend(User ** input, User ** set, int from, int to, size_t n, int(*algorithm)(User *, User **))
+{
+    User *user;
+    int votes;
+    char progress[] = ".";
+    char path[32];
     
+    FILE *fresults;
+    
+    if(pid > 0) sprintf(path, "data/results.txt");
+    else        sprintf(path, "data/results-1.txt");
+
+    if((fresults = fopen(path, "w")) == NULL) {
+        printf("can't create results file.");
+        exit(1);
+    }
+    
+    for(int i = from; i < to; i++) {
+        /* Print progress */
+        if(i > 0 && i % (stats.input_count / 100) == 0) write(1, progress, 1);
+        
+        user = input[i];
+        user->recommend = calloc(stats.repo_count, sizeof(Match));
+        
+        /* Run algorithm and get number of votes */
+        votes = algorithm(user, set);
+        
+        if(votes) {
+            //realloc(user->recommend, votes * sizeof(Match));
+            qsort(user->recommend, votes, sizeof(Match), &compare_matches);
+            result(user, n, fresults);
+        }
+        else free(user->recommend);
+    }
+    
+    fclose(fresults);
+}
+
+void result(User *user, size_t n, FILE *fp)
+{
+    fprintf(fp, "%d:", user->id);
+   
+    for(int i = 0; i < n; i++) {
+        if(user->recommend + i && user->recommend[i].repo) {
+            if(i) fprintf(fp, ",");
+            fprintf(fp, "%d", user->recommend[i].repo->id); 
+        }
+    }
+    fprintf(fp, "\n");
 }
 
 int compare_matches(const void *a, const void *b)
@@ -28,7 +78,7 @@ inline char find(void *needle, void *haystack, size_t size)
     return FALSE;
 }
 
-struct match* find_match(Repo *repo, struct match *matches, size_t size) {
+inline Match* find_match(Repo *repo, Match *matches, size_t size) {
     for(int i = 0; i < size; i++) if(matches[i].repo == repo) return matches + i;
     return NULL;
 }
@@ -41,55 +91,29 @@ inline int normalize_tapered(int x, int max, int norm, int v) {
     return ceil((normalize(x, max, norm) * (1 + ((max - x) / (float)max) * v)));
 }
 
-void masters_from_forks(User *user, struct match *vote, int *vote_count) {
-    Repo *fork;
-    for(int i = 0; i < user->watch_count; i++) {
-        fork = user->watch[i]->fork;
-        
-        if(fork && !find(fork, user->watch, user->watch_count)) {
-            *vote_count = *vote_count + 1;
-            vote->weight = BASE_WEIGHT * 10000;
-            vote->repo = fork;
-        }
-    }
-}
-
-User ** by_owner(User ** test, User ** set, int from, int to) {
+int by_owner(User *user, User ** set) {
     Repo *repo;
     Repo *owner[512];
-    User *user;
-    Match votes[stats.repo_count];
-    int owner_count = 0, i, j, vote_count;
-    
-    for(int k = from; k < to; k++) {
-        user = test[k];
-        
-        for(i = 0; i < user->watch_count; i++) {
-            owner_count = 0;
-            for(j = 0; j < stats.repo_count; j++) {
-                repo = repos_array[j];
-                
-                if(!strcmp(user->watch[i]->owner_name, repo->owner_name)
-                   && !find(repo, user->watch, user->watch_count)) {
-                    owner[owner_count++] = repo;
-                }
+    int owner_count = 0, i, j, votes = 0;
+            
+    for(i = 0; i < user->watch_count; i++) {
+        owner_count = 0;
+        for(j = 0; j < stats.repo_count; j++) {
+            repo = repos_array[j];
+            
+            if(!strcmp(user->watch[i]->owner_name, repo->owner_name)
+               && !find(repo, user->watch, user->watch_count)) {
+                owner[owner_count++] = repo;
             }
-            qsort(owner, owner_count, P_SIZE, &compare_repos);
-            
-            votes[vote_count].repo = owner[0];
-            votes[vote_count++].weight = 8000;
-            
-            //        for(int j = 0; j < 3; j++) {
-            //            if(owner[j]) {
-            //                votes[*vote_count].repo = owner[j];
-            //                votes[*vote_count].weight = owner[j]->watchers;   
-            //                *vote_count = *vote_count + 1;
-            //            }
-            //            else break;
-            //        }     
+        }
+        qsort(owner, owner_count, P_SIZE, &compare_repos);
+                
+        for(int j = 0; owner[j]; j++) {
+            user->recommend[votes].repo = owner[j];
+            user->recommend[votes++].weight = owner[i]->watchers;
         }
     }
-    return test;
+    return votes;
 }
 
 struct lang *find_lang(int id, struct lang *langs) {
@@ -99,104 +123,77 @@ struct lang *find_lang(int id, struct lang *langs) {
     return NULL;
 }
 
-User ** forks(User ** test, User ** set, int from, int to) {
+int forks(User *user, User ** set) {
     Repo *fork;
-    User *user;
-    Match votes[stats.repo_count];
-    int vote_count = 0;
+    int votes = 0;
     
-    for(int k = from; k < to; k++) {
-        user = test[k];
-        for(int i = 0; i < user->watch_count; i++) {
-            fork = user->watch[i]->fork;
-            
-            if(fork && !find(fork, user->watch, user->watch_count)) {
-                votes[vote_count].weight = fork->watchers;
-                votes[vote_count++].repo = fork;
-            }
+    for(int i = 0; i < user->watch_count; i++) {
+        fork = user->watch[i]->fork;
+        
+        if(fork && !find(fork, user->watch, user->watch_count)) {
+            user->recommend[votes].weight = fork->watchers;
+            user->recommend[votes++].repo = fork;
         }
     }
-    return test;
+    return votes;
 }
 
-User ** nearest_neighbour(User ** test, User ** set, int from, int to)
-{
-    int i, j, k, m, vote;
-    Repo *repo, *candidates[WATCH_SIZE];
-    register User *current;
-    struct match votes[stats.repo_count], *match;
-    int vote_count, candidate_count;
-    int matches;
-    char progress[] = ".";
+int popular(User *user, User ** set) {
+    int k = 0, votes = 0;
     
-    /* Each test-case */
-    for(i = from; i < to; i++) {
-        current = test[i]; vote_count = 0;
-        memset(votes, 0, stats.repo_count * sizeof(struct match));
+    /* Fill the rest with most popular repos */
+    for(int m = 0; m < RECOMMEND_SIZE; m++) {
+        if(!user->recommend[m].repo) {
+            user->recommend[m].repo = repos_array[k];
+            user->recommend[m].weight = BASE_WEIGHT;
+            k++;
+        }
+    } 
+    return votes;
+}
+
+int nearest_neighbour(User *user, User ** set)
+{
+    int i, k, vote;
+    Repo *repo, *candidates[WATCH_SIZE];
+    Match *match;
+    int votes = 0, candidate_count;
+    int matches;
+    
+    /* Each user in the set */
+    for(i = 0; i < stats.filtered_user_count; i++) {
+        if(user == set[i]) continue;
         
-        /* Print progress */
-        if(i > 0 && i % (stats.test_count / 100) == 0) {
-            write(1, progress, 1);
+        matches = candidate_count = 0;
+        
+        /* Get number of matches, and store the rest in candidates[] */
+        for(k = 0; k < set[i]->watch_count; k++) {
+            repo = set[i]->watch[k];
+            if(find(repo, user->watch, user->watch_count)) matches++;
+            else candidates[candidate_count++] = repo;
         }
         
-        /* Each user in the set */
-        for(j = 0; j < stats.filtered_user_count; j++) {
-            if(current == set[j]) continue;
+        /* If the watch-list is similar enough (lots of matches) */
+        if(matches > (user->watch_count * REPO_MATCH_TRESHOLD)) {
             
-            matches = candidate_count = 0;
-                        
-            /* Get number of matches, and store the rest in candidates[] */
-            for(k = 0; k < set[j]->watch_count; k++) {
-                repo = set[j]->watch[k];
-                if(find(repo, current->watch, current->watch_count)) matches++;
-                else candidates[candidate_count++] = repo;
-            }
+            vote = normalize(matches, set[i]->watch_count, 100);
             
-            /* If the watch-list is similar enough (lots of matches) */
-            if(matches > (current->watch_count * REPO_MATCH_TRESHOLD)) {
+            /* Go through candidates, and add them to recommendations */
+            for(k = 0; k < candidate_count; k++) {
+                repo = candidates[k];
                 
-                vote = normalize(matches, set[j]->watch_count, 100);// - abs(current->watch_count - set[j]->watch_count);
-                //if(vote <= 0) vote = 1;
-                
-                /* Go through candidates, and add them to recommendations */
-                for(k = 0; k < candidate_count; k++) {
-                    repo = candidates[k];
-                                        
-                    /* repo is already in recommendation list, add a vote */
-                    if(match = find_match(repo, votes, vote_count)) match->weight += vote;
-                    else {
-                        votes[vote_count].repo = repo;
-                        votes[vote_count++].weight = vote;
-                    }
+                /* repo is already in recommendation list, add a vote */
+                if(match = find_match(repo, user->recommend, votes)) match->weight += vote;
+                else {
+                    //user->recommend[votes] = malloc(sizeof(Match));
+                    user->recommend[votes].repo = repo;
+                    user->recommend[votes++].weight = vote
+                        + normalize(repo->watchers, stats.max_watchers, 10);
                 }
             }
         }
-        /* Sort votes by weight and copy them in current->recommend */
-        qsort(votes, vote_count, sizeof(struct match), &compare_matches);
-        memcpy(current->recommend, votes, RECOMMEND_SIZE * sizeof(struct match));
-        
-        k = 0;
-        
-        /* Fill the rest with most popular repos */
-        for(m = 0; m < RECOMMEND_SIZE; m++) {
-            if(!current->recommend[m].repo) {
-                //while(k < stats.repo_count) {
-                    //print(m);
-                    //if(repos_array[k]->langs[0].id == current->langs[0].id) {
-                        current->recommend[m].repo = repos_array[k];
-                        current->recommend[m].weight = BASE_WEIGHT;
-                        k++;
-                      //  break;
-                    //}
-                   // else k++;
-                //}
-
-            }
-        }
-        // printf("%d > %d > %d | ", votes[0].weight,votes[1].weight,current->recommend[2].weight) ;
-        
     }
-    return test;
+    return votes;
 }
 
 void get_langs(User *user) {

@@ -22,9 +22,6 @@
 #define USER_MAX_WATCH 80
 #define USER_MIN_WATCH 2
 
-/* Recommendation weight controls */
-#define MATCHES_WEIGHT 1
-#define WATCHERS_WEIGHT 0.1
 #define BASE_WEIGHT 10
 
 #define TRUE 1
@@ -37,7 +34,7 @@
 struct Stats {
     int user_count;
     int repo_count;
-    int test_count;
+    int input_count;
     int watch_count;
     int max_watchers;
     int last_user;
@@ -74,7 +71,7 @@ struct user {
     int hip_factor;
     struct repo *watch[WATCH_SIZE];
     int watch_count;
-    struct match recommend[RECOMMEND_SIZE];
+    struct match *recommend;
     struct lang langs[LANGS];
     int lang_count;
 };
@@ -85,6 +82,7 @@ typedef struct lang Lang;
 typedef struct match Match;
 
 struct repo ** repos_array;
+pid_t pid;
 
 struct user ** load_files();
 struct user ** filter();
