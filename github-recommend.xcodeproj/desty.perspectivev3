@@ -216,7 +216,7 @@
 						<key>_historyCapacity</key>
 						<integer>0</integer>
 						<key>bookmark</key>
-						<string>C37BF3201030DC0900522A6D</string>
+						<string>C37BF3261030DE2300522A6D</string>
 						<key>history</key>
 						<array>
 							<string>C3F171151030CC9100291DCA</string>
@@ -358,7 +358,7 @@
 								<key>PBXProjectModuleGUID</key>
 								<string>C3A586A410250DEA00E9C6CE</string>
 								<key>PBXProjectModuleLabel</key>
-								<string>recommend.c</string>
+								<string>main.c</string>
 								<key>PBXSplitModuleInNavigatorKey</key>
 								<dict>
 									<key>Split0</key>
@@ -366,20 +366,20 @@
 										<key>PBXProjectModuleGUID</key>
 										<string>C3A586A510250DEA00E9C6CE</string>
 										<key>PBXProjectModuleLabel</key>
-										<string>recommend.c</string>
+										<string>main.c</string>
 										<key>_historyCapacity</key>
 										<integer>0</integer>
 										<key>bookmark</key>
-										<string>C37BF31F1030DC0900522A6D</string>
+										<string>C37BF3251030DE2300522A6D</string>
 										<key>history</key>
 										<array>
 											<string>C3F1701D1030B20300291DCA</string>
 											<string>C3F1706D1030BE1300291DCA</string>
 											<string>C3F1706E1030BE1300291DCA</string>
 											<string>C37BF2E61030D3C100522A6D</string>
-											<string>C37BF2E71030D3C100522A6D</string>
+											<string>C37BF3211030DE2300522A6D</string>
+											<string>C37BF3221030DE2300522A6D</string>
 											<string>C37BF3141030DAD900522A6D</string>
-											<string>C37BF31E1030DC0700522A6D</string>
 										</array>
 										<key>prevStack</key>
 										<array>
@@ -401,6 +401,8 @@
 											<string>C37BF3041030D81200522A6D</string>
 											<string>C37BF3161030DAD900522A6D</string>
 											<string>C37BF3171030DAD900522A6D</string>
+											<string>C37BF3231030DE2300522A6D</string>
+											<string>C37BF3241030DE2300522A6D</string>
 										</array>
 									</dict>
 									<key>SplitCount</key>

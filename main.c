@@ -8,6 +8,8 @@
 
 #include "main.h"
 #include "recommend.h"
+
+/* Where to split the input file */
 #define SPLIT 1500
 
 User **users;
@@ -39,12 +41,14 @@ int main(int argc, const char *argv[])
     printf("] 100\n   ");
     fflush(stdout);
     
+    /* Fork the process 
+     to run on both cores */
     pid = fork();
     
     if(pid > 0) {
         t = time(NULL);
         recommend(input, filtered_users, 0, SPLIT, 10, &nearest_neighbour);
-        wait(&status);
+        wait(&status); /* Wait for the child to finish */
         printf("\n");
         printf("total time: %lds\n", time(NULL) - t);
         printf("printing results to results.txt\n");
@@ -85,10 +89,10 @@ User** load_files()
     repos = calloc(128000, P_SIZE);
     repos_array = calloc(128000, P_SIZE);
 
-    fdata  = fopen("github_resys/data/training_data.txt", "r");
-    ftest  = fopen("github_resys/data/local_test.txt", "r");
-    //fdata  = fopen("data/data.txt", "r");
-    //ftest  = fopen("data/test.txt", "r");
+    //fdata  = fopen("github_resys/data/training_data.txt", "r");
+    //ftest  = fopen("github_resys/data/local_test.txt", "r");
+    fdata  = fopen("data/data.txt", "r");
+    ftest  = fopen("data/test.txt", "r");
     frepos = fopen("data/repos.txt", "r");
     flang  = fopen("data/lang.txt", "r");
     
@@ -162,7 +166,6 @@ User** load_files()
     }
 
     stats.last_user = user;
-    
     
     /*
      *  Languages

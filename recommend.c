@@ -40,7 +40,6 @@ void recommend(User ** input, User ** set, int from, int to, size_t n, int(*algo
         votes = algorithm(user, set);
         
         if(votes) {
-            //realloc(user->recommend, votes * sizeof(Match));
             qsort(user->recommend, votes, sizeof(Match), &compare_matches);
             result(user, n, fresults);
         }
@@ -185,7 +184,6 @@ int nearest_neighbour(User *user, User ** set)
                 /* repo is already in recommendation list, add a vote */
                 if(match = find_match(repo, user->recommend, votes)) match->weight += vote;
                 else {
-                    //user->recommend[votes] = malloc(sizeof(Match));
                     user->recommend[votes].repo = repo;
                     user->recommend[votes++].weight = vote
                         + normalize(repo->watchers, stats.max_watchers, 10);
