@@ -63,7 +63,7 @@ struct repo {
 
 struct match {
     struct repo *repo;
-    int weight;
+    double weight;
 };
 
 struct user {
@@ -88,8 +88,8 @@ struct user ** load_files();
 struct user ** filter();
 struct user ** analyze(struct user ** test, struct user ** set, int from, int to);
 void results(struct user ** set, int from, int to);
-int normalize(int n, int max, int norm);
-int normalize_tapered(int x, int max, int norm, int v);
+double normalize(int n, int max, int norm);
+double normalize_tapered(int x, int max, int norm, int v);
 char find(void *needle, void *haystack, size_t size);
 int compare_langs(const void*, const void*);
 int compare_repos(const void*, const void*);

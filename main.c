@@ -11,6 +11,8 @@
 
 /* Where to split the input file */
 #define SPLIT 1500
+#define RESULTS 20
+#define ALGORITHM best_friend
 
 User **users;
 Repo **repos;
@@ -47,15 +49,14 @@ int main(int argc, const char *argv[])
     
     if(pid > 0) {
         t = time(NULL);
-        recommend(input, filtered_users, 0, SPLIT, 10, &nearest_neighbour);
+        recommend(input, filtered_users, 0, SPLIT, RESULTS, &ALGORITHM);
         wait(&status); /* Wait for the child to finish */
         printf("\n");
         printf("total time: %lds\n", time(NULL) - t);
         printf("printing results to results.txt\n");
     }
     else if(pid == 0) {
-        recommend(input, filtered_users, SPLIT, stats.input_count, 10, &nearest_neighbour);
-        printf("*"); fflush(stdout);
+        recommend(input, filtered_users, SPLIT, stats.input_count, RESULTS, &ALGORITHM);
     }
     else {
         fprintf(stderr, "couldn't fork!");
@@ -76,6 +77,11 @@ int main(int argc, const char *argv[])
     return 0;
 }
 
+/*
+ *
+ * LOAD DATA FILES
+ *
+ */
 User** load_files()
 {
     FILE *fdata  = NULL, 
@@ -232,6 +238,11 @@ User** load_files()
     return test;
 }
 
+/*
+ *
+ * FILTER DATA
+ *
+ */
 User ** filter()
 {    
     /* Filter users */

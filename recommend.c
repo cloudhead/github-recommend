@@ -9,6 +9,8 @@
 #include "main.h"
 #include "recommend.h"
 
+#define CUT_OFF 70
+
 int compare_matches(const void *, const void *);
 void result(User *, size_t, FILE *);
 
@@ -16,7 +18,7 @@ void recommend(User ** input, User ** set, int from, int to, size_t n, int(*algo
 {
     User *user;
     int votes;
-    char progress[] = ".";
+    char progress = '.';
     char path[32];
     
     FILE *fresults;
@@ -31,7 +33,7 @@ void recommend(User ** input, User ** set, int from, int to, size_t n, int(*algo
     
     for(int i = from; i < to; i++) {
         /* Print progress */
-        if(i > 0 && i % (stats.input_count / 100) == 0) write(1, progress, 1);
+        if(i > 0 && i % (stats.input_count / 100) == 0) write(1, &progress, 1);
         
         user = input[i];
         user->recommend = calloc(stats.repo_count, sizeof(Match));
@@ -39,11 +41,10 @@ void recommend(User ** input, User ** set, int from, int to, size_t n, int(*algo
         /* Run algorithm and get number of votes */
         votes = algorithm(user, set);
         
-        if(votes) {
-            qsort(user->recommend, votes, sizeof(Match), &compare_matches);
-            result(user, n, fresults);
-        }
-        else free(user->recommend);
+        if(votes) qsort(user->recommend, votes, sizeof(Match), &compare_matches);
+        
+        result(user,  n, fresults);
+        free(user->recommend);
     }
     
     fclose(fresults);
@@ -54,7 +55,7 @@ void result(User *user, size_t n, FILE *fp)
     fprintf(fp, "%d:", user->id);
    
     for(int i = 0; i < n; i++) {
-        if(user->recommend + i && user->recommend[i].repo) {
+        if(user->recommend[i].weight) {
             if(i) fprintf(fp, ",");
             fprintf(fp, "%d", user->recommend[i].repo->id); 
         }
@@ -65,10 +66,15 @@ void result(User *user, size_t n, FILE *fp)
 int compare_matches(const void *a, const void *b)
 {
     struct match *x, *y;
+    double result;
     x = (struct match*)a;
     y = (struct match*)b;
     
-    return y->weight - x->weight;
+    result = y->weight - x->weight;
+    
+    if     (result > 0) return  1;
+    else if(result < 0) return -1;
+    else                return  0;
 }
 
 inline char find(void *needle, void *haystack, size_t size)
@@ -77,17 +83,17 @@ inline char find(void *needle, void *haystack, size_t size)
     return FALSE;
 }
 
-inline Match* find_match(Repo *repo, Match *matches, size_t size) {
+Match* find_match(Repo *repo, Match *matches, size_t size) {
     for(int i = 0; i < size; i++) if(matches[i].repo == repo) return matches + i;
     return NULL;
 }
 
-inline int normalize(int n, int max, int norm) {
-    return (int)(n / (float)max * norm);
+inline double normalize(int n, int max, int norm) {
+    return (double)n / (double)max * (double)norm;
 }
 
-inline int normalize_tapered(int x, int max, int norm, int v) {
-    return ceil((normalize(x, max, norm) * (1 + ((max - x) / (float)max) * v)));
+inline double normalize_tapered(int x, int max, int norm, int v) {
+    return normalize(x, max, norm) * (1 + ((max - x) / (double)max) * v);
 }
 
 int by_owner(User *user, User ** set) {
@@ -97,6 +103,7 @@ int by_owner(User *user, User ** set) {
             
     for(i = 0; i < user->watch_count; i++) {
         owner_count = 0;
+        memset(owner, 0, 512 * P_SIZE);
         for(j = 0; j < stats.repo_count; j++) {
             repo = repos_array[j];
             
@@ -106,13 +113,58 @@ int by_owner(User *user, User ** set) {
             }
         }
         qsort(owner, owner_count, P_SIZE, &compare_repos);
-                
-        for(int j = 0; owner[j]; j++) {
+        j = 0;
+        while(owner[j]) {
             user->recommend[votes].repo = owner[j];
-            user->recommend[votes++].weight = owner[i]->watchers;
+            user->recommend[votes++].weight = owner[j]->watchers;
+            j++;
         }
     }
     return votes;
+}
+
+int best_friend(User *user, User ** set) {
+    int best_vote = 0, temp_vote, owner_count = 0;
+    char best_friend[128];
+    char temp_friend[128];
+    
+    Repo *repo;
+    Repo *owner[512];
+    
+    for(int i = 0; i < user->watch_count; i++) {
+        strcpy(temp_friend, user->watch[i]->owner_name);
+        temp_vote = 0;
+        for(int j = 0; j < user->watch_count; j++) {
+            if(j == i) continue;
+            if(!strcmp(temp_friend, user->watch[j]->owner_name)) temp_vote++;
+        }
+        if(temp_vote > best_vote) {
+            best_vote = temp_vote;
+            strcpy(best_friend, temp_friend);
+        }
+    }
+    
+    /* Get best friend's repos */
+    if(best_vote >= user->watch_count / 2 && user->watch_count > 4
+        || best_vote >= 2
+        || user->watch_count < 5) {
+        for(int j = 0; j < stats.repo_count; j++) {
+            repo = repos_array[j];
+            
+            if(!strcmp(best_friend, repo->owner_name)
+               && !find(repo, user->watch, user->watch_count)) {
+                owner[owner_count++] = repo;
+            }
+        }
+        qsort(owner, owner_count, P_SIZE, &compare_repos);
+
+        for(int j = 0; j < owner_count; j++) {
+            user->recommend[j].repo = owner[j];
+            user->recommend[j].weight = normalize(best_vote, user->watch_count, 100);
+            j++;
+        }
+    }
+    return owner_count;
 }
 
 struct lang *find_lang(int id, struct lang *langs) {
@@ -140,25 +192,30 @@ int forks(User *user, User ** set) {
 int popular(User *user, User ** set) {
     int k = 0, votes = 0;
     
-    /* Fill the rest with most popular repos */
-    for(int m = 0; m < RECOMMEND_SIZE; m++) {
-        if(!user->recommend[m].repo) {
-            user->recommend[m].repo = repos_array[k];
-            user->recommend[m].weight = BASE_WEIGHT;
-            k++;
-        }
-    } 
+    if(user->watch_count <= 1) {
+        for(int i = 0; i < 40; i++) {
+            if(!find(repos_array[k], user->watch, user->watch_count)) {
+                user->recommend[i].repo = repos_array[k];
+                user->recommend[i].weight = repos_array[k]->watchers;
+                k++;
+            }
+        } 
+    }
     return votes;
 }
 
-int nearest_neighbour(User *user, User ** set)
+int nearest_neighbour(User *user, User ** set, int langs)
 {
-    int i, k, vote;
+    int i, k;
+    double vote;
     Repo *repo, *candidates[WATCH_SIZE];
     Match *match;
-    int votes = 0, candidate_count;
+    int votes = 0;
+    int candidate_count;
     int matches;
     
+    if(langs) get_langs(user);
+
     /* Each user in the set */
     for(i = 0; i < stats.filtered_user_count; i++) {
         if(user == set[i]) continue;
@@ -181,17 +238,27 @@ int nearest_neighbour(User *user, User ** set)
             for(k = 0; k < candidate_count; k++) {
                 repo = candidates[k];
                 
+                if(langs) vote += match_langs(user->langs, repo->langs, user->lang_count, repo->lang_count);
+
                 /* repo is already in recommendation list, add a vote */
                 if(match = find_match(repo, user->recommend, votes)) match->weight += vote;
                 else {
                     user->recommend[votes].repo = repo;
                     user->recommend[votes++].weight = vote
-                        + normalize(repo->watchers, stats.max_watchers, 10);
+                        + normalize(repo->watchers, stats.max_watchers, 1);
                 }
             }
         }
     }
     return votes;
+}
+
+int nn(User *user, User **set) {
+    return nearest_neighbour(user, set, FALSE);
+}
+
+int nn_langs(User *user, User **set) {
+    return nearest_neighbour(user, set, TRUE);
 }
 
 void get_langs(User *user) {
@@ -219,13 +286,13 @@ void get_langs(User *user) {
     qsort(user->langs, LANGS, sizeof(struct lang), &compare_langs);
 }
 
-int match_langs(Lang *user_langs, Lang *repo_langs, int ul_count, int rl_count) {
-    int vote = 0;
+double match_langs(Lang *user_langs, Lang *repo_langs, int ul_count, int rl_count) {
+    double vote = 0;
     
     for(int i = 0; i < ul_count; i++)
         for(int j = 0; j < rl_count; j++)
             if(user_langs[i].id == repo_langs[j].id)
-                vote += (ul_count + rl_count) - (i + j);
+                vote += sqrt(pow((ul_count - i), 2) + pow((rl_count - j), 2));
     
     return vote;
 }
